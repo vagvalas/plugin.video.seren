@@ -32,7 +32,11 @@ class ThreadPoolExecutor(concurrent.futures.ThreadPoolExecutor):
 				# associated futures.
 				while True:
 					try:
-						work_item = self._work_queue.get_nowait()
+						try: 
+							work_item = self._work_queue.get_nowait()
+						except: 
+							self._work_queue.put(None)
+							break
 					except self.queue.Empty:
 						break
 					if work_item is not None:

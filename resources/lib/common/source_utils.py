@@ -509,6 +509,7 @@ def get_filter_season_pack_fn(simple_info):
 
 	season_fill = season.zfill(2)
 	season_check = f"s{season}"
+	season_check2 = f"s{season_fill}"
 	season_fill_check = f"s%{season_fill}"
 	season_full_check = f"season {season}"
 	season_full_fill_check = f"season {season_fill}"
@@ -519,11 +520,14 @@ def get_filter_season_pack_fn(simple_info):
 
 	suffixes = [
 		season_check,
+		season_check2,
 		season_fill_check,
 		season_full_check,
 		season_full_fill_check,
 	]
+
 	regex_pattern = _get_regex_pattern(clean_titles, suffixes)
+
 
 	def filter_fn(release_title):
 		"""
@@ -535,6 +539,8 @@ def get_filter_season_pack_fn(simple_info):
 		if episode_number_match:
 			return False
 
+		#g.log(regex_pattern)
+		#g.log(release_title)
 		return bool(re.match(regex_pattern, release_title))
 
 	return filter_fn

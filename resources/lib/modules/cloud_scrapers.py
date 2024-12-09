@@ -48,6 +48,8 @@ class CloudScraper(ApiBase):
 			self._build_regex()
 
 		cloud_items = self._fetch_cloud_items()
+		#g.log('cloud_items')
+		#g.log(len(cloud_items))
 
 		if type(cloud_items) != list:
 			g.log(f"There was a faliure at the API level getting the cloud files from {self.debrid_provider}", "error")
@@ -64,8 +66,12 @@ class CloudScraper(ApiBase):
 		cloud_items = self._identify_items(cloud_items)
 		if self._preterm_check():
 			return []
+		#g.log('cloud_items2')
+		#g.log(len(cloud_items))
+		#g.log(cloud_items)
 		cloud_items = [self._source_to_file(i) for i in cloud_items]
 		cloud_items = [i for i in cloud_items if i]
+		
 		if self._preterm_check():
 			return []
 		cloud_items = self._apply_general_filter(cloud_items)
@@ -73,6 +79,7 @@ class CloudScraper(ApiBase):
 			return []
 		cloud_items = self._finalise_identified_items(cloud_items)
 		g.log(f"{self.debrid_provider} cloud scraper found {len(cloud_items)} source", "info")
+		#g.log(cloud_items)
 		return cloud_items
 
 	def _normalize_item(self, item):
@@ -80,6 +87,8 @@ class CloudScraper(ApiBase):
 
 	@staticmethod
 	def _apply_general_filter(cloud_items):
+		#g.log('_apply_general_filter')
+		#g.log([i for i in cloud_items if i['release_title'].endswith(g.common_video_extensions)])
 		return [i for i in cloud_items if i['release_title'].endswith(g.common_video_extensions)]
 
 	def _identify_items(self, cloud_items):
@@ -201,9 +210,18 @@ class RealDebridCloudScraper(CloudScraper):
 		)
 
 	def _fetch_cloud_items(self):
+		#g.log('_fetch_cloud_items')
 		return self.api_adapter.list_torrents()
 
 	def _source_to_file(self, source):
+		response = source
+		torrent_id = response['id']
+		self.api_adapter.torrent_select_all(torrent_id)
+		torrent_info = self.api_adapter.torrent_info(torrent_id)
+		source = torrent_info
+		#if "files" in torrent_info:
+		#	torrent_info["files"] = [file for file in torrent_info["files"] if 'sample' not in file['path'].lower() and source_utils.is_file_ext_valid(file["path"])]
+		#g.log(source)
 		if "links" not in source:
 			return None
 		source_files = self._normalize_item(self.api_adapter.torrent_info(source['id'])['files'])
@@ -211,6 +229,7 @@ class RealDebridCloudScraper(CloudScraper):
 		[file.update({"idx": idx}) for idx, file in enumerate(source_files)]
 		source_files = self._identify_items(source_files)
 		[file.update({"url": source['links'][file['idx']]}) for file in source_files]
+		#g.log(source_files)
 		return source_files[0] if source_files else None
 
 	def _is_enabled(self):

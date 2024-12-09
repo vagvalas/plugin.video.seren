@@ -141,7 +141,14 @@ class TraktSyncDatabase(trakt_sync.TraktSyncDatabase):
 
 		if not self.sync_errors:
 			self._update_activity_record("all_activities", update_time)
-			xbmc.executebuiltin('RunPlugin("plugin://plugin.video.seren/?action=widgetRefresh&playing=False")')
+			#xbmc.executebuiltin('RunPlugin("plugin://plugin.video.seren/?action=widgetRefresh&playing=False")')
+			if_playing = params.get('playing')
+			if if_playing is not None:
+				if_playing = False if if_playing.lower() == "false" else True if if_playing.lower() == "true" else None
+			if if_playing is not None:
+				g.trigger_widget_refresh(if_playing=if_playing)
+			else:
+				g.trigger_widget_refresh()
 
 	def _do_sync_acitivites(self, remote_activities):
 		total_activities = len(self._sync_activities_list)

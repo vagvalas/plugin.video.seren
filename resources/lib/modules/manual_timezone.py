@@ -1,7 +1,7 @@
 import xbmcgui
 
 from resources.lib.modules.globals import g
-from resources.lib.third_party import pytz
+import pytz
 
 
 def validate_timezone_detected():

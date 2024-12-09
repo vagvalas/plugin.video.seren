@@ -264,6 +264,8 @@ class _connection(metaclass=ABCMeta):
 					self._retry_handler(e)
 					retry_count += 1
 				except Exception:
+					self._log_error(query, 'self._connection.close()')
+					self._connection.close()
 					self._log_error(query, data)
 					raise
 

@@ -270,6 +270,17 @@ class Sources:
 	def _create_torrent_threads(self):
 		if self._torrents_enabled():
 			random.shuffle(self.torrent_providers)
+			self.torrent_providers2 = []
+			for idx,i in enumerate(self.torrent_providers):
+				#g.log(i)
+				if i[1] == 'cached':
+					self.torrent_providers2.append(i)
+					break
+			for i in self.torrent_providers:
+				if i[1] != 'cached':
+					self.torrent_providers2.append(i)
+			self.torrent_providers = self.torrent_providers2
+
 			for i in self.torrent_providers:
 				self.torrent_threads.put(
 					self._get_provider_sources, self.item_information, i, 'torrentCache', self._process_torrent_source
@@ -1132,6 +1143,9 @@ class TorrentCacheCheck:
 		:return: None
 		:rtype: None
 		"""
+		
+		#g.log(torrent_list)
+		
 		if g.real_debrid_enabled() and g.get_bool_setting('rd.torrents'):
 			self.threads.put(self._realdebrid_worker, copy.deepcopy(torrent_list), info)
 
@@ -1178,6 +1192,7 @@ class TorrentCacheCheck:
 			self.store_torrent(source)
 
 	def _handle_episode_rd_worker(self, source, real_debrid_cache, info):
+		g.log('_handle_episode_rd_worker')
 		for storage_variant in real_debrid_cache[source['hash']]['rd']:
 
 			if not self.rd_api.is_streamable_storage_type(storage_variant):

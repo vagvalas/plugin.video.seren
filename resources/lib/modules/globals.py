@@ -20,7 +20,9 @@ from unidecode import unidecode
 from resources.lib.common import tools
 from resources.lib.modules.settings_cache import PersistedSettingsCache
 from resources.lib.modules.settings_cache import RuntimeSettingsCache
-from resources.lib.third_party import pytz
+import pytz
+
+from infotagger.listitem import ListItemInfoTag
 
 viewTypes = [
 	("Default", 50),
@@ -587,6 +589,7 @@ class GlobalVariables:
 
 	def _init_paths(self):
 		self.ADDONS_PATH = tools.translate_path(os.path.join("special://home/", "addons/"))
+		self.KODI_DB_PATH = tools.translate_path("special://database")
 		self.ADDON_PATH = tools.translate_path(os.path.join("special://home/", f"addons/{self.ADDON_ID.lower()}"))
 		self.ADDON_DATA_PATH = tools.translate_path(self.ADDON.getAddonInfo("path"))  # Addon folder
 		self.ADDON_USERDATA_PATH = tools.translate_path(
@@ -621,24 +624,28 @@ class GlobalVariables:
 			return MySqlConnection(config)
 
 	def get_kodi_database_version(self):
-		kodi_myvideos_version_map = {
-			17: 107,
-			18: 116,
-			19: 119,
-			20: 121,
-			21: 131,
-		}
+		from os import walk
+		filenames = next(walk(self.KODI_DB_PATH), (None, None, []))[2]
+		import re
+		list_of_files = []
+		for i in filenames:
+			if 'MyVideos' in i:
+				list_of_files.append(i)
 
-		if (db_version := kodi_myvideos_version_map.get(self.KODI_VERSION)) is None:
-			raise KeyError("Unsupported kodi version")
-
-		return db_version
+		def extract_number(f):
+			s = re.findall("\d+$",f)
+			return (int(s[0]) if s else -1,f)
+		max_file = max(list_of_files,key=extract_number)
+		max_number = int(max_file.split('.')[0].replace('MyVideos',''))
+		return max_number
 
 	def get_kodi_video_db_config(self):
 		result = {"type": "sqlite3", "database": f"MyVideos{self.get_kodi_database_version()}"}
 
 		if xbmcvfs.exists(self.ADVANCED_SETTINGS_PATH):
 			if advanced_settings_text := g.read_all_text(self.ADVANCED_SETTINGS_PATH):
+				from xml.etree import ElementTree  # Do NOT move this outside class as it can cause hard kodi crashes!
+
 				try:
 					advanced_settings = ElementTree.fromstring(advanced_settings_text)
 					if settings := advanced_settings.find("videodatabase"):
@@ -1144,7 +1151,7 @@ class GlobalVariables:
 
 	@cached_property
 	def common_video_extensions(self):
-		return tuple({ext for ext in xbmc.getSupportedMedia("video").split("|") if ext not in {"", ".zip", ".rar", ".url"}})
+		return tuple({ext for ext in xbmc.getSupportedMedia("video").split("|") if ext not in {"", ".zip", ".rar"}})
 
 	def add_directory_item(self, name, **params):
 		menu_item = params.pop("menu_item", {})
@@ -1152,10 +1159,12 @@ class GlobalVariables:
 			menu_item = {}
 
 		item = xbmcgui.ListItem(label=name, offscreen=True)
+		info_tag = ListItemInfoTag(item, 'video')
 		item.setContentLookup(False)
 
 		info = menu_item.pop("info", {})
-		item.addStreamInfo("video", {})
+		#item.addStreamInfo("video", {})
+		#info_tag.add_stream_info("video", {})
 
 		if info is None or not isinstance(info, dict):
 			info = {}
@@ -1225,7 +1234,8 @@ class GlobalVariables:
 		cast = menu_item.get("cast", [])
 		if cast is None or not isinstance(cast, (set, list)):
 			cast = []
-		item.setCast(cast)
+		#item.setCast(cast)
+		info_tag.set_cast(cast)
 
 		for key, value in info.items():
 			if key.endswith("_id"):
@@ -1237,7 +1247,8 @@ class GlobalVariables:
 			"imdb_id": "imdb",
 			"tvdb_id": "tvdb",
 		}
-		item.setUniqueIDs(
+		#item.setUniqueIDs(
+		info_tag.set_unique_ids(
 			{
 				unique_id_key: info[f"tvshow.{id_key}" if media_type in ["episode", "season"] else id_key]
 				for id_key, unique_id_key in id_keys.items()
@@ -1245,9 +1256,11 @@ class GlobalVariables:
 			}
 		)
 
+		info_tag2 = item.getVideoInfoTag()
 		for i in info:
 			if i.startswith("rating."):
-				item.setRating(i.split(".")[1], float(info[i].get("rating", 0.0)), int(info[i].get("votes", 0)), False)
+				#item.setRating(i.split(".")[1], float(info[i].get("rating", 0.0)), int(info[i].get("votes", 0)), False)
+				info_tag2.setRatings({i.split(".")[1]: [ float(info[i].get("rating", 0.0)), int(info[i].get("votes", 0))]}, "False")
 
 		cm = params.pop("cm", [])
 		if cm is None or not isinstance(cm, (set, list)):
@@ -1275,7 +1288,21 @@ class GlobalVariables:
 		# Convert dates to localtime for display
 		self.convert_info_dates(info)
 
-		item.setInfo("video", info)
+		#item.setInfo("video", info)
+		info_tag = ListItemInfoTag(item, 'video')
+		try:
+			studio = []
+			for i in info['studio']:
+				studio.append(i)
+			info['studio'] = studio
+		except: pass
+		try: 
+			country = []
+			for i in info['country']:
+				country.append(i)
+			info['country'] = country
+		except: pass
+		info_tag.set_info(info)
 
 		bulk_add = params.pop("bulk_add", False)
 		url = self.create_url(self.BASE_URL, params)
@@ -1342,25 +1369,21 @@ class GlobalVariables:
 		else:
 			xbmcplugin.endOfDirectory(self.PLUGIN_HANDLE, succeeded=False, cacheToDisc=False)
 
-	def read_all_text(self, file_path):
+	@staticmethod
+	def read_all_text(file_path):
 		try:
-			f = xbmcvfs.File(file_path, "r")
-			return f.read()
+			with xbmcvfs.File(file_path, "r") as f:
+				return f.read()
 		except OSError:
 			return None
-		finally:
-			with contextlib.suppress(Exception):
-				f.close()
 
-	def write_all_text(self, file_path, content):
+	@staticmethod
+	def write_all_text(file_path, content):
 		try:
-			f = xbmcvfs.File(file_path, "w")
-			return f.write(content)
+			with xbmcvfs.File(file_path, "w") as f:
+				return f.write(content)
 		except OSError:
 			return None
-		finally:
-			with contextlib.suppress(Exception):
-				f.close()
 
 	def notification(self, heading, message, time=5000, sound=True):
 		if self.get_bool_setting("general.disableNotificationSound"):
@@ -1468,13 +1491,9 @@ class GlobalVariables:
 
 	@staticmethod
 	def wait_for_abort(timeout=1.0):
-		monitor = None
-		try:
-			monitor = xbmc.Monitor()
-			abort_requested = monitor.waitForAbort(timeout)
-		finally:
-			del monitor
-
+		monitor = xbmc.Monitor()
+		abort_requested = monitor.waitForAbort(timeout)
+		del monitor
 		return abort_requested
 
 	@staticmethod

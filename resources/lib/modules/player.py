@@ -16,6 +16,7 @@ from resources.lib.indexers import trakt
 from resources.lib.modules import smartPlay
 from resources.lib.modules.globals import g
 
+from infotagger.listitem import ListItemInfoTag
 
 class SerenPlayer(xbmc.Player):
 	"""
@@ -24,6 +25,9 @@ class SerenPlayer(xbmc.Player):
 
 	def __init__(self):
 		super().__init__()
+
+		# Store the plugin handle to a runtime setting so we can check later if this is last player instance created
+		g.set_runtime_setting("player.handle", g.PLUGIN_HANDLE)
 
 		self.trakt_id = None
 		self.mediatype = None
@@ -102,11 +106,22 @@ class SerenPlayer(xbmc.Player):
 		self._handle_bookmark()
 		self._add_support_for_external_trakt_scrobbling()
 
-		self.playing_next_time = max(self.playing_next_time, self.item_information["info"]["duration"] * (1 - (g.get_int_setting("playingnext.percent") / 100)))
-
 		xbmcplugin.setResolvedUrl(g.PLUGIN_HANDLE, True, self._create_list_item(stream_link))
 
 		self._keep_alive()
+		self.resumed = False
+		self.playback_started = False
+		self.playback_error = False
+		self.playback_ended = False
+		self.playback_stopped = False
+		self.scrobbled = False
+		self.scrobble_started = False
+		self.last_attempted_scrobble_stop = 0
+		self.last_attempted_scrobble_pause = 0
+		self.marked_watched = False
+		self.dialogs_triggered = False
+		self.pre_scrape_initiated = False
+		self.playback_timestamp = 0
 
 	# region Kodi player overrides
 	def getTotalTime(self):
@@ -306,10 +321,13 @@ class SerenPlayer(xbmc.Player):
 		g.close_all_dialogs()
 
 		if self.smart_playlists and self.mediatype == "episode":
+			original_size = g.PLAYLIST.size()
 			if g.PLAYLIST.size() == 1 and not self.smart_module.is_season_final():
 				self.smart_module.build_playlist()
 			elif g.PLAYLIST.size() == g.PLAYLIST.getposition() + 1:
 				self.smart_module.append_next_season()
+				if g.PLAYLIST.size() == original_size:
+					self.smart_module.build_playlist()
 
 	def _end_playback(self):
 		self._handle_bookmark()
@@ -345,18 +363,45 @@ class SerenPlayer(xbmc.Player):
 			if not hasattr(provider_module, "get_listitem") and hasattr(provider_module, "sources"):
 				provider_module = provider_module.sources()
 			item = provider_module.get_listitem(stream_link)
-			item.setInfo("video", info)
+			#item.setInfo("video", info)
+			info_tag = ListItemInfoTag(item, 'video')
+			studio = []
+			for i in info['studio']:
+					studio.append(i)
+			info['studio'] = studio
+			country = []
+			for i in info['country']:
+					country.append(i)
+			info['country'] = country
+
+			info_tag.set_info(info)
 		else:
 			item = xbmcgui.ListItem(path=stream_link)
 			info["FileNameAndPath"] = parse.unquote(self.playing_file)
-			item.setInfo("video", info)
+			info_tag = ListItemInfoTag(item, 'video')
+			studio = []
+			for i in info['studio']:
+					studio.append(i)
+			info['studio'] = studio
+			country = []
+			for i in info['country']:
+					country.append(i)
+			info['country'] = country
+			info_tag.set_info(info)
+			#item.setInfo("video", info)
 			item.setProperty("IsPlayable", "true")
 
 		art = self.item_information.get("art", {})
 		item.setArt(art if isinstance(art, dict) else {})
 		cast = self.item_information.get("cast", [])
-		item.setCast(cast if isinstance(cast, list) else [])
-		item.setUniqueIDs(
+		#item.setCast(cast if isinstance(cast, list) else [])
+		info_tag = ListItemInfoTag(item, 'video')
+		#info_tag = item.getVideoInfoTag()
+		info_tag.set_cast(cast if isinstance(cast, list) else [])
+		#item.setUniqueIDs(
+		#	{i.split("_")[0]: info[i] for i in info if i.endswith("id")},
+		#)
+		info_tag.set_unique_ids(
 			{i.split("_")[0]: info[i] for i in info if i.endswith("id")},
 		)
 		return item
@@ -510,7 +555,10 @@ class SerenPlayer(xbmc.Player):
 
 	def _keep_alive(self):
 		for _ in range(480):
-			if self._is_file_playing() or self._playback_has_stopped() or g.wait_for_abort(0.25):
+			if g.get_int_runtime_setting("player.handle", g.PLUGIN_HANDLE) > g.PLUGIN_HANDLE:
+				g.log(f"Exiting old player instance ({g.PLUGIN_HANDLE})", "warning")
+				return
+			elif self._is_file_playing() or self._playback_has_stopped() or g.wait_for_abort(0.25):
 				break
 
 		self.total_time = self.getTotalTime()
@@ -549,8 +597,8 @@ class SerenPlayer(xbmc.Player):
 
 	def _handle_pre_scrape(self):
 		if self.pre_scrape_enabled and not self.pre_scrape_initiated:
-			self.smart_module.pre_scrape()
 			self.pre_scrape_initiated = True
+			self.smart_module.pre_scrape()
 
 	def _try_get_bookmark(self):
 		bm = self.bookmark_sync.get_bookmark(self.trakt_id)
