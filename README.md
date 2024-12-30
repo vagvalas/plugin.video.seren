@@ -8,22 +8,19 @@
 
 Seren is a multi-source addon for Kodi with the added ability to install custom provider modules. Unlike other Kodi addons which are generally built for a single service use, Seren allows users to connect to multiple online/offline services at once for their viewing with a single click.
 
-## FAQ
+## Fixes for Python-2 Version of Seren 2.2.4 (by vagvalas)
 
-> #### How do I install a new provider?
+Tried a sketchy fix inspired by the Python-3 fix with new RD's API implementation, as described here:
+https://github.com/nixgates/plugin.video.seren/issues/949#issuecomment-2498755711
+For some reason a lot of people still needed a Seren with Python-2 suppport for Nvidia Shields or old tv-boxes
 
-In the settings menu of Seren you will find a providers tab. Inside this tab you will find the install provider package option.
+2.2.5 Fixes this but its a bit slow
 
-> #### How do manage my providers?
+## BUGS
 
-Within Seren's settings, you will find the providers tab. Within this tab you can disable/enable single providers inside provide packs, enable/disable entire provider packages, enable/ disable automatic provider updates and manually for a update check for your providers.
-
-> #### Seren won't show me season or episode lists and instead begins playing automatically?
-
-Please disable the Auto Episode Resume setting in the general tab of Seren's settings.
-
-> #### I'm experiencing an issue whilst using Seren. Where can I get help?
-You can often find help from users in the Addons4Kodi subreddit or you are always welcome to log a github issue and I will contact you directly to investigate the issue.
+Found out that if the source selected is not playable (as you cant know before selecting it) it hangs there, as no prompt appearing 
+as the new 3.0.1 version for selecting manually a playable file (as there isn't any playable files :P) and had to be skipped.
+-Working right now on a fix for that behaviour :P
 
 ## License
 
