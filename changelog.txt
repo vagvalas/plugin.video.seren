@@ -1,3 +1,6 @@
+Changelog 2.2.6
+[BUG] Fix the non-playable file source hanging there. Now should skip any that can not be played
+
 Changelog 2.2.5
 [BUG] Fix RD playback again with new implementation by RD's API
 
