@@ -14,13 +14,15 @@ Tried a sketchy fix inspired by the Python-3 fix with new RD's API implementatio
 https://github.com/nixgates/plugin.video.seren/issues/949#issuecomment-2498755711
 For some reason a lot of people still needed a Seren with Python-2 suppport for Nvidia Shields or old tv-boxes
 
+2.2.6 Fixes the behaviour of not playing , non playable sources, by skipping them, should work faster now
 2.2.5 Fixes this but its a bit slow
 
 ## BUGS
 
-Found out that if the source selected is not playable (as you cant know before selecting it) it hangs there, as no prompt appearing 
-as the new 3.0.1 version for selecting manually a playable file (as there isn't any playable files :P) and had to be skipped.
+~~Found out that if the source selected is not playable (as you cant know before selecting it) it hangs there, as no prompt appearing 
+as the new 3.0.1 version for selecting manually a playable file (as there isn't any playable files :P) and had to be skipped.~~
 -Working right now on a fix for that behaviour :P
+FIXED. 2.2.6
 
 ## License
 
