@@ -264,10 +264,10 @@ class Sources(object):
     def _is_playable_source(self, filtered=False):
         stats = self.sources_information['statistics']
         stats = stats['filtered'] if filtered else stats
-        for stype in ["torrentsCached", "cloudFiles", "adaptive", "hosters"]:
-            if stats[stype]["total"] > 0:
-                return True
-        return False
+        return any(
+			stats[stype].get("total", 0) > 0
+			for stype in ["torrentsCached", "cloudFiles", "adaptiveSources", "hosters", "directSources"]
+		)
 
     def _finalise_results(self):
         monkey_requests.allow_provider_requests = False
@@ -1121,19 +1121,10 @@ class TorrentCacheCheck:
     def _realdebrid_worker(self, torrent_list, info):
 
         try:
-            hash_list = [i['hash'] for i in torrent_list]
-            api = real_debrid.RealDebrid()
-            real_debrid_cache = api.check_hash(hash_list)
-
             for i in torrent_list:
                 try:
-                    if 'rd' not in real_debrid_cache.get(i['hash'], {}):
-                        continue
-                    if len(real_debrid_cache[i['hash']]['rd']) >= 1:
-                        if self.scraper_class.media_type == 'episode':
-                            self._handle_episode_rd_worker(i, real_debrid_cache, info)
-                        else:
-                            self._handle_movie_rd_worker(i, real_debrid_cache)
+					i['debrid_provider'] = 'real_debrid'
+					self.store_torrent(i)
                 except KeyError:
                     pass
         except Exception:
