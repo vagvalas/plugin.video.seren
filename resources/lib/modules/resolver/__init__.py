@@ -58,7 +58,6 @@ class Resolver:
                 break
 
         return stream_link, release_title
-
     def resolve_single_source(self, source, item_information, pack_select=False, silent=False):
         """
         Resolves source to a streamable object
@@ -73,34 +72,44 @@ class Resolver:
         try:
             if source["type"] == "adaptive":
                 stream_link = source
-
+            elif source["type"] == "direct":
+                stream_link = source["url"]
             elif source["type"] == "torrent":
                 stream_link = self._resolve_debrid_source(
                     self.resolvers[source["debrid_provider"]],
                     source,
                     item_information,
                     pack_select,
+                )
+
+                # Prompt user to manually resolve if torrent resolution fails
+                if (
+                    not stream_link
+                    and self.torrent_resolve_failure_style == 1
+                    and not pack_select
+                    and not silent
+                    and xbmcgui.Dialog().yesno(
+                        g.ADDON_NAME,
+                        g.get_language_string(30490),  # Message to prompt user for manual resolution
+                    )
+                ):
+                    stream_link = self._resolve_debrid_source(
+                        self.resolvers[source["debrid_provider"]],
+                        source,
+                        item_information,
+                        True,  # Enable manual resolution
                     )
 
-                if not stream_link and self.torrent_resolve_failure_style == 1 and not pack_select and not silent:
-                    if xbmcgui.Dialog().yesno(g.ADDON_NAME, g.get_language_string(30490)):
-                        stream_link = self._resolve_debrid_source(
-                            self.resolvers[source["debrid_provider"]],
-                            source,
-                            item_information,
-                            True,
-                            )
-
-            elif source["type"] == "hoster" or source["type"] == "cloud":
+            elif source["type"] in ["hoster", "cloud"]:
                 stream_link = self._resolve_hoster_or_cloud(source, item_information)
 
             if stream_link:
                 return stream_link, source['release_title']
-            else:
-                g.log("Failed to resolve source: {}".format(source), "error")
-                return None, None
+            g.log("Failed to resolve source: {}".format(source), "error")
+            return None, None
         except ResolverFailure as e:
             g.log('Failed to resolve source: {}'.format(e))
+            return None, None
 
     @staticmethod
     def _handle_provider_imports_resolving(source):
