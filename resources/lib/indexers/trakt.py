@@ -780,47 +780,38 @@ class TraktAPI(ApiBase):
 			return items
 
 		supported_sorts = [
-			"added",
-			"rank",
-			"title",
-			"released",
-			"runtime",
-			"popularity",
-			"votes",
-			"random",
-			"runtime",
-			"percentage",
-			"watched",
-			"collected",
+			"added", "rank", "title", "released", "runtime", "popularity",
+			"votes", "random", "runtime", "percentage", "watched", "collected",
 			"my_rating",
 		]
 
+		# Validate the sort_by key
 		if sort_by not in supported_sorts:
-			g.log(f"Error sorting trakt response: Unsupported sort_by ({sort_by})", "error")
-			return items
+			g.log(f"Unsupported sort_by ({sort_by}). Defaulting to 'rank'.", "warning")
+			sort_by = "rank"  # Default to a valid key
 
-		if sort_by == "added":
-			items = sorted(items, key=lambda x: x.get("listed_at"))
-		elif sort_by == "rank":
-			items = sorted(items, key=lambda x: x.get("rank"))
+		# Sorting logic with None handling
+		if sort_by == "rank":
+			items = sorted(items, key=lambda x: x.get("rank") or 0)  # Default rank to 0
+		elif sort_by == "added":
+			items = sorted(items, key=lambda x: x.get("listed_at") or "")
 		elif sort_by == "title":
 			items = sorted(items, key=self._title_sorter)
 		elif sort_by == "released":
 			items = sorted(items, key=self._released_sorter)
 		elif sort_by == "runtime":
-			items = sorted(items, key=lambda x: x[x["type"]].get("runtime"))
+			items = sorted(items, key=lambda x: x[x["type"]].get("runtime") or 0)
 		elif sort_by == "popularity":
 			items = sorted(
 				items,
 				key=lambda x: float(x[x["type"]].get("rating", 0) * int(x[x["type"]].get("votes", 0))),
 			)
 		elif sort_by == "votes":
-			items = sorted(items, key=lambda x: x[x["type"]].get("votes"))
+			items = sorted(items, key=lambda x: x[x["type"]].get("votes") or 0)
 		elif sort_by == "percentage":
-			items = sorted(items, key=lambda x: x[x["type"]].get("rating"))
+			items = sorted(items, key=lambda x: x[x["type"]].get("rating") or 0)
 		elif sort_by == "random":
 			import random
-
 			random.shuffle(items)
 		elif sort_by == "watched":
 			items = self._watched_sort(items)
@@ -833,6 +824,8 @@ class TraktAPI(ApiBase):
 			items.reverse()
 
 		return items
+
+
 
 	@staticmethod
 	def _title_sorter(item):
